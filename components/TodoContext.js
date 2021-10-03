@@ -1,63 +1,78 @@
-import React, { useState, createContext } from "react";
+import React, { useState, createContext, useEffect } from "react";
+import AsyncStorage from '@react-native-async-storage/async-storage'
 
 export const TodoContext = createContext();
 
 export const TodoProvider = (props) => {
-    const [todos, setTodos] = useState([
-        {
-            id: 1,
-            text: "Walk 🐶 doggie",
-            completed: false,
-            edit: false
-        },
-        {
-            id: 2,
-            text: "Take shower",
-            completed: false,
-            edit: false,
-            favorite: false
-        },
-        {
-            id: 3,
-            text: "Do homework 📚",
-            completed: false,
-            edit: false,
-            favorite: false
-        },
-        {
-            id: 4,
-            text: "Create 👨🏾‍💻 some more",
-            completed: false,
-            edit: false,
-            favorite: false
-        },
-    ]);
+    const [storageValue, updateStorage] = useAsyncStorage("todo-app", []);
+    const [todos, setTodos] = useState(storageValue);
+
+    useEffect(() => {
+        setTodos(storageValue)
+        // console.log('todos array changed', todos)
+    }, [storageValue])
 
     const markComplete = (id) => {
-        todos.map((todo) => {
+        storageValue.map((todo) => {
             if (todo.id === id) {
                 todo.completed = !todo.completed;
             }
-            return todo;
+            // return todo;
         });
-        setTodos([...todos]);
+        updateStorage([...todos]);
     };
 
     const deleteTodo = (id) => {
-        const newTodos = todos.filter((todo) => todo.id !== id);
-        setTodos(newTodos);
+        const newTodos = storageValue.filter((todo) => todo.id !== id)
+        updateStorage(newTodos)
     };
 
-    const favorite = (id) => {
-        const todo = todos.find(element => element.id === id);
-        let newTodos = todos.filter((todo) => todo.id !== id);
-        newTodos.unshift(todo);
-        setTodos(newTodos);
-    };
+    function useAsyncStorage(key, defaultValue) {
+        const [storageValue, updateStorageValue] = useState(defaultValue);
+        const [updated, setUpdated] = useState(false);
 
+        async function getStorageValue() {
+            let value = defaultValue;
+            try {
+                value = JSON.parse(await AsyncStorage.getItem(key)) || defaultValue;
+                // console.log('1 getStorageValue:', value)
+            } catch (e) {
+                // console.log('catch error:', e);
+            } finally {
+                updateStorageValue(value);
+                setUpdated(true);
+                // console.log('2 getStorageValue finally:', value)
+            }
+        }
+
+        async function updateStorage(newValue) {
+            try {
+                if (newValue === null) {
+                    await AsyncStorage.removeItem(key);
+                    // console.log('3 value is null', newValue);
+                } else {
+                    const value = JSON.stringify(newValue);
+                    await AsyncStorage.setItem(key, value);
+                    // console.log('4 value not null', value);
+                }
+            } catch (e) {
+            } finally {
+                setUpdated(false);
+                getStorageValue();
+                // console.log('5 updateStorage: updated', storageValue);
+            }
+        }
+
+        useEffect(() => {
+            getStorageValue();
+            // console.log('6 useEffect: storageValue', storageValue)
+        }, [updated]);
+
+        return [storageValue, updateStorage];
+    };
 
     return (
-        <TodoContext.Provider value={[todos, setTodos, markComplete, deleteTodo, favorite]}>
+        <TodoContext.Provider value={[storageValue, updateStorage, markComplete, deleteTodo]}>
             {props.children}
         </TodoContext.Provider>
     );

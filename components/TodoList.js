@@ -1,23 +1,22 @@
 import React, { useState, useContext } from 'react';
 import { TodoContext } from "./TodoContext";
-import { StyleSheet, Text, TextInput, View, TouchableOpacity, ScrollView, KeyboardAvoidingView, TouchableWithoutFeedback, Keyboard, Platform } from 'react-native';
-import Todo from './Todo';
 import Completed from './Completed';
+import Todo from './Todo';
+import { StyleSheet, Text, TextInput, View, TouchableOpacity, ScrollView, KeyboardAvoidingView, TouchableWithoutFeedback, Keyboard, Platform } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 
-
 const TodoList = () => {
-    const [todos, setTodos] = useContext(TodoContext);
+    const [storageValue, updateStorage, markComplete, deleteTodo] = useContext(TodoContext);
     const [input, setInput] = useState('')
 
     const newTodo = (text) => {
-        return { text, id: Date.now(), completed: false, edit: false };
+        return { text, id: Date.now(), completed: false, edit: false, important: false };
     }
 
     const addTodo = (e) => {
         const text = input.trim();
         if (text) {
-            setTodos([...todos, newTodo(text)]);
+            updateStorage([...storageValue, newTodo(text)]);
         }
         setInput('');
     };
@@ -26,9 +25,11 @@ const TodoList = () => {
         <KeyboardAvoidingView style={styles.container}
             behavior={Platform.OS === "ios" ? "padding" : "height"}
         >
-            <Text  style={styles.title}>TODO</Text>
-            <ScrollView  style={styles.listContainer}>
-                {todos.filter((todo) => todo.completed === false).map((todo) => <Todo todo={todo} key={todo.id} />)}
+            <View style={styles.titleContainer}>
+                <Text style={styles.title}>TODO</Text>
+            </View>
+            <ScrollView style={styles.listContainer}>
+                {storageValue.filter((todo) => todo.completed === false).map((todo) => <Todo todo={todo} key={todo.id} />)}
                 <Completed />
             </ScrollView>
             <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
@@ -40,7 +41,7 @@ const TodoList = () => {
                         placeholder="Add Todo"
                         onSubmitEditing={addTodo}
                         placeholderTextColor='white'
-                        
+
                     />
                     <TouchableOpacity
                         style={styles.button}
@@ -58,8 +59,15 @@ export default TodoList
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        justifyContent:'center',
+        justifyContent: 'center',
         alignItems: 'center',
+        // backgroundColor: 'red',
+    },
+    titleContainer:{
+        width:'100%',
+        backgroundColor:'rgba(0,0,0,.2)',
+        paddingHorizontal: 4,
+
     },
     title: {
         fontSize: 30,
@@ -69,7 +77,7 @@ const styles = StyleSheet.create({
     },
     listContainer: {
         // flex:1,
-        width:"100%",
+        width: "100%",
         // borderWidth: 2,
         // borderColor: 'skyblue',
         // margin: 6,
@@ -84,15 +92,15 @@ const styles = StyleSheet.create({
         // borderWidth:1
     },
     input: {
-        flex:1,
+        flex: 1,
         height: 44,
         // margin: 4,
         padding: 10,
         borderRadius: 10,
         fontSize: 20,
         backgroundColor: '#222',
-        opacity:.7,
-        color:'#fff'
+        opacity: .7,
+        color: '#fff'
         // shadowColor: "#000",
         //     shadowOffset: {
         //         width: 0,

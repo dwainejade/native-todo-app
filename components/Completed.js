@@ -1,15 +1,15 @@
 import React, { useContext, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Todo from './Todo';
-import { TodoContext as context } from './TodoContext';
+import { TodoContext } from './TodoContext';
 import { Badge, List } from 'react-native-paper';
 
 const Completed = () => {
-    const [todos, setTodos] = useContext(context);
+    const [storageValue, updateStorage] = useContext(TodoContext);
     const [expanded, setExpanded] = useState(true);
     const handlePress = () => setExpanded(!expanded);
 
-    const done = todos.filter(todo => todo.completed === true)
+    const done = storageValue.filter(todo => todo.completed === true)
 
     return (
         <View>

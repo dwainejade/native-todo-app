@@ -1,53 +1,95 @@
-import React, { useContext, useState } from 'react'
+import React, { useContext, useEffect, useState } from 'react'
 import { TodoContext } from "./TodoContext";
 import { PanGestureHandler } from 'react-native-gesture-handler';
-import Animated, { useAnimatedGestureHandler, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
-import { StyleSheet, Text, View, TouchableOpacity, TextInput } from 'react-native'
+import Animated, { useAnimatedGestureHandler, useAnimatedStyle, useSharedValue, withTiming, runOnJS } from 'react-native-reanimated';
+import { StyleSheet, Text, View, TouchableOpacity, TextInput, useWindowDimensions } from 'react-native'
 import { MaterialIcons } from '@expo/vector-icons';
 
 const Todo = ({ todo }) => {
-    const [todos, setTodos, markComplete, deleteTodo, favorite] = useContext(TodoContext);
+    const [storageValue, updateStorage, markComplete, deleteTodo] = useContext(TodoContext);
     const [input, setInput] = useState(todo.text);
+    // const [isImportant, setIsImportant] = useState(false)
 
     const handleEdit = (todo) => {
-        todos.map((t) => {
+        storageValue.map((t) => {
             if (t.edit) {
-                todo.edit = !todo.edit;
-                handleSave(t);
+                t.edit = !t.edit;
             }
         });
-        todos.map((t) => {
+        storageValue.map((t) => {
             if (t.id === todo.id) {
                 todo.edit = !todo.edit;
             }
         });
-        setTodos([...todos]);
-        return todo
+        updateStorage([...storageValue]);
     };
 
     const handleSave = (todo) => {
-        todos.map((t) => {
+        storageValue.map((t) => {
             if (t.id === todo.id) {
                 todo.text = input;
                 todo.edit = !todo.edit;
             }
         });
-        setTodos([...todos]);
+        updateStorage([...storageValue]);
         if (!todo.text) {
             deleteTodo(todo.id);
         }
     };
 
-    const translateX = useSharedValue(0)
+    const markImportant = (todo) => {
+        let lastImportantIndex = -1;
+        storageValue.splice(storageValue.indexOf(todo), 1);
+        if (todo.important) {
+            for (let i = 0; i < storageValue.length; i++) {
+                if (storageValue[i].important) {
+                    lastImportantIndex = i;
+                }
+                else {
+                    break;
+                }
+            }
+            todo.important = false;
+            storageValue.splice(lastImportantIndex + 1, 0, todo);
+        }
+        else {
+            todo.important = true;
+            storageValue.unshift(todo);
+        }
+        updateStorage([...storageValue]);
+    };
+
+    const translateX = useSharedValue(0);
+    const opacity = useSharedValue(1)
+    const itemHeight = useSharedValue(44)
+    const { width: SCREEN_WIDTH } = useWindowDimensions();
+    const TRANSLATEX_TRESHOLD = SCREEN_WIDTH * -.3;
+
+    const asyncDelete = (id) => {
+        setTimeout(() => {
+            deleteTodo(id)
+        }, 300);
+    }
 
     const panGesture = useAnimatedGestureHandler({
         onActive: (event) => {
-            translateX.value = event.translationX
+            translateX.value = event.translationX;
+            // console.log(translateX.value);
         },
         onEnd: () => {
-            translateX.value = withTiming(0);
+            const shouldDismiss = translateX.value < TRANSLATEX_TRESHOLD;
+            if (shouldDismiss) {
+                translateX.value = withTiming(-SCREEN_WIDTH)
+                opacity.value = withTiming(0)
+                runOnJS(asyncDelete)(todo.id)
+                itemHeight.value = withTiming(0)
+            } else {
+                translateX.value = withTiming(0);
+            }
         },
     });
+
+
 
     const rStyle = useAnimatedStyle(() => ({
         transform: [
@@ -57,74 +99,77 @@ const Todo = ({ todo }) => {
         ],
     }));
 
-    const LIST_ITEM_HEIGHT = 70
+    const rIconContainerStyle = useAnimatedStyle(() => {
+        const opacity = translateX.value < TRANSLATEX_TRESHOLD ? 1 : 0;
+        return { opacity }
+    });
+
+    useEffect(() => {
+
+    }, [input])
 
     return (
-        <PanGestureHandler onGestureEvent={panGesture}>
-            <Animated.View style={[styles.card, rStyle]}>
-                {/* if a todo is being edited it will display as an TextInput */}
-                {todo.edit ? (
-                    <View >
-                        <TextInput
-                            style={styles.editInput}
-                            value={input}
-                            onChangeText={setInput}
-                            onSubmitEditing={() => handleSave(todo)}
-                            autoFocus={true}
-                        />
-                        <TouchableOpacity
-                            onPress={() => handleSave(todo)}
-                        >
-                            {/* <MaterialCommunityIcons name="content-save-outline" size={24} color="black" /> */}
-                        </TouchableOpacity>
-                    </View>
-
-                ) : (
-
-                    // if todo is completed it will display as a checked icon 
-                    <View style={styles.container}>
-
-                        <TouchableOpacity onPress={() => markComplete(todo.id)}>
-                            {
-                                todo.completed ?
-                                    <MaterialIcons name="check-circle-outline" size={26} color="black" />
-                                    :
-                                    <MaterialIcons name="radio-button-unchecked" size={26} color="black" />
-                            }
-                        </TouchableOpacity>
-
-                        {/* pressing a todo will trigger handleEdit */}
-                        <TouchableOpacity
-                            style={styles.textWrapper}
-                            onPress={() => handleEdit(todo)}
-                        >
-                            <Text style={styles.text}>{todo.text}</Text>
-                        </TouchableOpacity>
-
-                        {/* delete button */}
-                        <View style={styles.iconsRight}>
-                            <TouchableOpacity
-                                style={styles.iconContainer}
-                                onPress={() => deleteTodo(todo.id)}
-                            >
-                                {
-                                    todo.favorite ?
-                                        <MaterialIcons name="delete-ouline" size={26} color="salmon" />
-                                        :
-                                        <MaterialIcons name="delete-outline" size={26} color="black" />
-                                }
-                                {/* <MaterialIcons name="star-outline" size={24} color="black" /> */}
-                            </TouchableOpacity>
-                        </View>
-            <View style={styles.iconContainer}>
-
-            </View>
-                    </View>
-                )}
+        <Animated.View >
+            <Animated.View style={[styles.iconContainer, rIconContainerStyle]}>
+                <MaterialIcons name="delete-outline" size={26} color="red" />
             </Animated.View>
-        </PanGestureHandler>
+
+            <PanGestureHandler onGestureEvent={panGesture}>
+                <Animated.View style={[styles.card, rStyle]}>
+                    {/* if a todo is being edited it will display as an TextInput */}
+                    {todo.edit ? (
+                        <View >
+                            <TextInput
+                                style={styles.editInput}
+                                value={input}
+                                onChangeText={setInput}
+                                onSubmitEditing={() => handleSave(todo)}
+                                autoFocus={true}
+                            />
+                        </View>
+
+                    ) : (
+
+                        // if todo is completed it will display as a checked icon 
+                        <View style={styles.container}>
+                            <TouchableOpacity onPress={() => markComplete(todo.id)}>
+                                {
+                                    todo.completed ?
+                                        <MaterialIcons name="check-circle-outline" size={26} color="black" />
+                                        :
+                                        <MaterialIcons name="radio-button-unchecked" size={26} color="black" />
+                                }
+                            </TouchableOpacity>
+
+                            {/* pressing a todo will trigger handleEdit */}
+                            <TouchableOpacity
+                                style={styles.textWrapper}
+                                onPress={() => handleEdit(todo)}
+                            >
+                                <Text style={styles.text}>{todo.text}</Text>
+                            </TouchableOpacity>
+
+                            {/* favorite/important button */}
+                            <View style={styles.iconsRight}>
+                                <TouchableOpacity
+                                    onPress={() => markImportant(todo)}
+                                >
+                                    {todo.important ? (
+                                        <MaterialIcons name="star" size={26} color="salmon" />
+                                    ) : (
+                                        <MaterialIcons name="star-outline" size={26} color="black" />
+                                    )}
+
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+                    )}
+                </Animated.View>
+            </PanGestureHandler>
+        </Animated.View>
     )
 }
+
 
 export default Todo
 
@@ -141,6 +186,7 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.15,
         shadowRadius: .84,
         elevation: 5,
+        zIndex: 2
     },
     container: {
         flexDirection: 'row',
@@ -164,12 +210,14 @@ const styles = StyleSheet.create({
         margin: 4,
         fontSize: 20
     },
-    iconContainer:{
-        position:'absolute',
+    iconContainer: {
+        position: 'absolute',
         height: 44,
-        backgroundColor:'red',
-        justifyContent:'center',
-        // alignItems:'center',
-        right:0
-    }
+        width: 44,
+        // backgroundColor: 'red',
+        justifyContent: 'center',
+        alignItems: 'center',
+        right: 10,
+        zIndex: -1
+    },
 })
